@@ -20,4 +20,11 @@ public interface IShopService extends IService<Shop> {
      * @return 成功时 data 为商铺信息，商铺不存在时返回失败
      */
     Result queryById(Long id);
+
+    /**
+     * 更新商铺信息，先更新数据库，再原子删除商铺缓存
+     * @param shop 商铺数据，必须包含 id
+     * @return 处理结果
+     */
+    Result updateShop(Shop shop);
 }

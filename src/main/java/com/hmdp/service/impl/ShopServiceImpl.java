@@ -9,9 +9,12 @@ import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
@@ -32,6 +35,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
+    @Resource
+    private RedisScript<Long> cacheShopDelScript;
+
     @Override
     public Result queryById(Long id) {
         // 1. 从 redis 查询商铺缓存
@@ -49,8 +55,24 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
         // 5. 数据库中存在，将商铺数据写入 redis 并设置有效期
         stringRedisTemplate.opsForValue()
-                .set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(shop));
+                .set(CACHE_SHOP_KEY + id, JSONUtil.toJsonStr(shop), CACHE_SHOP_TTL, TimeUnit.MINUTES);
         // 6. 返回商铺信息
         return Result.ok(shop);
+    }
+
+    @Override
+    @Transactional
+    public Result updateShop(Shop shop) {
+        Long id = shop.getId();
+        if (id == null) {
+            return Result.fail("店铺id不能为空");
+        }
+        // 1. 先更新数据库
+        updateById(shop);
+        // 2. 再执行 lua 脚本删除缓存，exists 判断与 del 删除在 redis 内原子完成
+        //    顺序不能颠倒：先删缓存再更库，并发读请求会把旧值重新写回缓存
+        stringRedisTemplate.execute(cacheShopDelScript,
+                Collections.singletonList(CACHE_SHOP_KEY + id));
+        return Result.ok();
     }
 }
