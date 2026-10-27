@@ -45,7 +45,7 @@ public class LoginInterceptor implements HandlerInterceptor {
         Map<Object, Object> userMap = stringRedisTemplate.opsForHash().entries(key);
         // 3. 用户不存在，拦截并返回 401
         if (userMap.isEmpty()) {
-            log.debug("token异常：{}", request.getRequestURI());
+            log.debug("token异常：请重新登录{}", request.getRequestURI());
             response.setStatus(401);
             return false;
         }
