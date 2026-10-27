@@ -11,7 +11,8 @@ spring:
   redis:
     host: 127.0.0.1
     port: 6379
-    password: 123456
+    # 本机 Redis 未设置 requirepass，配置密码会导致 AUTH 报错；若给 Redis 设了密码再打开此行
+#    password: 123456
     lettuce:
       pool:
         max-active: 10
