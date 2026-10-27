@@ -1,6 +1,7 @@
 package com.hmdp.config;
 
 import com.hmdp.interceptor.LoginInterceptor;
+import com.hmdp.interceptor.RefreshTokenInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -13,9 +14,16 @@ public class MvcConfig implements WebMvcConfigurer {
     @Resource
     private LoginInterceptor loginInterceptor;
 
+    @Resource
+    private RefreshTokenInterceptor refreshTokenInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 登录拦截器，拦截全部请求，放行登录、注册及无需登录的公开接口
+        // token 刷新拦截器：拦截全部路径，只解析登录态不拦截，
+        // 保证用户访问免登录接口时也能刷新 token 有效期
+        registry.addInterceptor(refreshTokenInterceptor)
+                .addPathPatterns("/**").order(1);
+        // 登录拦截器：拦截全部路径，放行登录、注册及无需登录的公开接口
         registry.addInterceptor(loginInterceptor)
                 .excludePathPatterns(
                         "/user/code",
@@ -25,6 +33,6 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/shop-type/**",
                         "/upload/**",
                         "/voucher/**"
-                ).order(1);
+                ).order(2);
     }
 }
