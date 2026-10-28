@@ -68,8 +68,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         boolean success = seckillVoucherService.update()
                 .setSql("stock = stock - 1")
                 .eq("voucher_id", voucherId)
+                .gt("stock", 0)
                 .update();
         if (!success) {
+            //当前查询的数据已经被别的线程所修改，并不安全，重试
             return Result.fail("库存不足，无法下单");
         }
 
