@@ -9,6 +9,8 @@ import com.hmdp.entity.UserInfo;
 import com.hmdp.service.IUserInfoService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.UserHolder;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,6 +24,7 @@ import javax.annotation.Resource;
  * @author 虎哥
  * @since 2021-12-22
  */
+@Tag(name = "01-用户管理", description = "用户登录、注册、个人信息相关接口")
 @Slf4j
 @RestController
 @RequestMapping("/user")
@@ -36,6 +39,7 @@ public class UserController {
     /**
      * 发送手机验证码
      */
+    @Operation(summary = "发送手机验证码")
     @PostMapping("code")
     public Result sendCode(@RequestParam("phone") String phone) {
         return userService.sendCode(phone);
@@ -45,6 +49,7 @@ public class UserController {
      * 登录功能
      * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
      */
+    @Operation(summary = "用户登录（手机号+验证码或手机号+密码）")
     @PostMapping("/login")
     public Result login(@RequestBody LoginFormDTO loginForm){
         return userService.login(loginForm);
@@ -54,12 +59,14 @@ public class UserController {
      * 登出功能
      * @return 无
      */
+    @Operation(summary = "用户登出")
     @PostMapping("/logout")
     public Result logout(){
         // TODO 实现登出功能
         return Result.fail("功能未完成");
     }
 
+    @Operation(summary = "获取当前登录用户信息")
     @GetMapping("/me")
     public Result me(){
         // TODO 获取当前登录的用户并返回
@@ -67,6 +74,7 @@ public class UserController {
         return Result.ok(user);
     }
 
+    @Operation(summary = "根据id查询用户详情")
     @GetMapping("/info/{id}")
     public Result info(@PathVariable("id") Long userId){
         // 查询详情

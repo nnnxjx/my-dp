@@ -10,6 +10,8 @@ import com.hmdp.service.IBlogService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -23,6 +25,7 @@ import java.util.List;
  * @author 虎哥
  * @since 2021-12-22
  */
+@Tag(name = "03-探店博文", description = "探店笔记发布、点赞、查询相关接口")
 @RestController
 @RequestMapping("/blog")
 public class BlogController {
@@ -32,6 +35,7 @@ public class BlogController {
     @Resource
     private IUserService userService;
 
+    @Operation(summary = "发布探店笔记")
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
         // 获取登录用户
@@ -43,6 +47,7 @@ public class BlogController {
         return Result.ok(blog.getId());
     }
 
+    @Operation(summary = "给探店笔记点赞")
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
         // 修改点赞数量
@@ -51,6 +56,7 @@ public class BlogController {
         return Result.ok();
     }
 
+    @Operation(summary = "分页查询我的探店笔记")
     @GetMapping("/of/me")
     public Result queryMyBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
         // 获取登录用户
@@ -63,6 +69,7 @@ public class BlogController {
         return Result.ok(records);
     }
 
+    @Operation(summary = "分页查询热门探店笔记")
     @GetMapping("/hot")
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
         // 根据用户查询

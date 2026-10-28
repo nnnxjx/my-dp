@@ -3,6 +3,11 @@ server:
 spring:
   application:
     name: hmdp
+  mvc:
+    # springfox 3.0.0 与 Spring Boot 2.6+ 默认的 PathPatternParser 不兼容，启动会报 Failed to start 'documentationPluginsBootstrapper'，必须改回 ant 匹配策略
+    # 属性名必须是 pathmatch（对应 WebMvcProperties#pathMatch），写错会被静默忽略从而仍然报错
+    pathmatch:
+      matching-strategy: ant_path_matcher
   datasource:
     driver-class-name: com.mysql.jdbc.Driver
     url: jdbc:mysql://localhost:3306/hmdp?useSSL=false&serverTimezone=UTC

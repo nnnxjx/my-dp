@@ -32,7 +32,12 @@ public class MvcConfig implements WebMvcConfigurer {
                         "/shop/**",
                         "/shop-type/**",
                         "/upload/**",
-                        "/voucher/**"
+                        "/voucher/**",
+                        // swagger 文档相关路径，未登录也要能访问
+                        "/swagger-ui/**",
+                        "/swagger-resources/**",
+                        "/v3/api-docs",
+                        "/webjars/**"
                 ).order(2);
     }
 }
