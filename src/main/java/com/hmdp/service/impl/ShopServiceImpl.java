@@ -9,7 +9,6 @@ import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
+import static com.hmdp.utils.RedisConstants.CACHE_NULL_TTL;
 
 /**
  * <p>
@@ -35,8 +35,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     @Resource
     private StringRedisTemplate stringRedisTemplate;
 
-    @Resource
-    private RedisScript<Long> cacheShopDelScript;
 
     @Override
     public Result queryById(Long id) {
@@ -47,10 +45,16 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             Shop cacheShop = JSONUtil.toBean(shopJson, Shop.class);
             return Result.ok(cacheShop);
         }
+        if(shopJson != null){
+            return Result.fail("商铺不存在");
+        }
         // 3. 缓存未命中，根据 id 查询数据库
         Shop shop = getById(id);
         // 4. 数据库中不存在，返回错误
         if (shop == null) {
+            //将空值写入redis
+            stringRedisTemplate.opsForValue()
+                    .set(CACHE_SHOP_KEY + id, "", CACHE_NULL_TTL, TimeUnit.MINUTES);
             return Result.fail("商铺不存在");
         }
         // 5. 数据库中存在，将商铺数据写入 redis 并设置有效期
@@ -69,10 +73,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         }
         // 1. 先更新数据库
         updateById(shop);
-        // 2. 再执行 lua 脚本删除缓存，exists 判断与 del 删除在 redis 内原子完成
-        //    顺序不能颠倒：先删缓存再更库，并发读请求会把旧值重新写回缓存
-        stringRedisTemplate.execute(cacheShopDelScript,
-                Collections.singletonList(CACHE_SHOP_KEY + id));
+        // 2. 删除 redis 缓存
+        stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
+
         return Result.ok();
     }
 }
