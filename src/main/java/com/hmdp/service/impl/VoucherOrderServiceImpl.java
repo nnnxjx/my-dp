@@ -10,6 +10,7 @@ import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.utils.GlobalIdGenerator;
 import com.hmdp.utils.UserHolder;
+import org.springframework.aop.framework.AopContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,7 +39,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
      * 流程：查询优惠券 -> 判断秒杀是否开始/结束 -> 判断库存是否充足 -> 扣减库存 -> 创建订单 -> 返回订单id
      */
     @Override
-    @Transactional
     public Result seckillVoucher(Long voucherId) {
         // 1. 获取当前登录用户（下单前必须登录）
         UserDTO user = UserHolder.getUser();
@@ -64,6 +64,25 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("库存不足，无法下单");
         }
 
+
+        synchronized (userId.toString().intern()){
+            // 获取当前类的代理对象，通过代理调用 createVoucherOrder，
+            // 使 @Transactional 生效，保证“一人一单”的查询与写入在同一事务、且在同一把锁内提交
+            IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
+            return proxy.createVoucherOrder(voucherId, userId);
+        }
+    }
+
+    @Override
+    @Transactional
+    public Result createVoucherOrder(Long voucherId,Long userId) {
+
+        //判断是否一人一单
+        Long count = this.query().eq("user_id", userId).eq("voucher_id", voucherId).count();
+        if (count > 0) {
+            return Result.fail("用户已购买过该优惠券");
+        }
+
         // 5. 扣减库存：带 stock > 0 条件更新，防止并发超卖；更新影响 0 行说明已被抢完
         boolean success = seckillVoucherService.update()
                 .setSql("stock = stock - 1")
@@ -77,12 +96,14 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
         // 6. 创建订单：使用全局 ID 生成器生成订单主键
         VoucherOrder order = new VoucherOrder();
+        LocalDateTime now = LocalDateTime.now();
         order.setId(globalIdGenerator.generateId("order"));
         order.setUserId(userId);
         order.setVoucherId(voucherId);
         order.setPayType(1);   // 支付方式：1-余额支付
         order.setStatus(1);    // 订单状态：1-未支付
         order.setCreateTime(now);
+
         order.setUpdateTime(now);
         save(order);
 
