@@ -2,21 +2,24 @@ package com.hmdp.utils;
 
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.BooleanUtil;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
+import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
 /**
  * 简单的分布式互斥锁工具类（基于 Redis）
  * <p>
- * 加锁：setnx（SETNX key value + EXPIRE），使用 setIfAbsent 携带过期时间，原子完成，避免死锁
- * 解锁：delete（DEL key）
+ * 加锁：setnx（SETNX key value + EXPIRE），使用 setIfAbsent 携带过期时间，原子完成，避免死锁。
+ * 锁的 value 存入“持有者标识”（当前线程标示），用于解锁时校验锁的归属。
+ * <p>
+ * 解锁：通过 Lua 脚本保证“判断持有者 + 删除”整个逻辑的原子性：
+ * 只有当锁中的标识与当前线程标识一致时才删除，否则什么都不做，避免误删其他线程持有的锁。
  * <p>
  * 实例通过构造函数传入业务名称 name，锁的真实 key 为 {@code lock:{name}}，
  * 不同的 name 之间互不影响，可用于隔离不同业务或不同资源的互斥。
- * <p>
- * 注意：本类为最简实现，解锁时不校验锁的持有者，极端情况下（业务执行时间超过过期时间导致锁被他人获取）
- * 可能误删他人的锁。若需严格安全，应改用“value 存唯一标识 + Lua 脚本判断后再删”的方案。
  */
 public class SimpleRedisLock {
 
@@ -25,7 +28,25 @@ public class SimpleRedisLock {
      */
     private static final String KEY_PREFIX = "lock:";
 
-    private final String ID_PREFIX = UUID.randomUUID().toString(true);
+    /**
+     * 释放锁的 Lua 脚本：从静态资源 lua/unlock.lua 读取。
+     * KEYS[1] 为锁的 key，ARGV[1] 为当前线程标识。
+     * 比较锁中的标识与当前线程标识是否一致，一致则删除锁，不一致则直接返回 0。
+     * 整个判断 + 删除由 Redis 单线程执行 Lua 保证原子性。
+     */
+    private static final DefaultRedisScript<Long> UNLOCK_REDIS_SCRIPT;
+
+    static {
+        UNLOCK_REDIS_SCRIPT = new DefaultRedisScript<>();
+        UNLOCK_REDIS_SCRIPT.setLocation(new ClassPathResource("lua/unlock.lua"));
+        UNLOCK_REDIS_SCRIPT.setResultType(Long.class);
+    }
+
+    /**
+     * JVM 级别的唯一前缀，配合线程 id 构成持有者标识，
+     * 保证集群部署下不同 JVM 的相同线程 id 也不会碰撞，避免误删他人的锁
+     */
+    private static final String ID_PREFIX = UUID.randomUUID().toString(true) + "-";
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -46,21 +67,20 @@ public class SimpleRedisLock {
      * @return 获取成功返回 true，锁已被占用返回 false
      */
     public boolean tryLock(long expireSeconds) {
-        //集群模式下也可以保证独特的线程标识
-        String threadId = ID_PREFIX+Thread.currentThread().getId();
+        // 持有者标识：JVM 唯一前缀 + 当前线程标示，写入 value，供解锁时校验锁的归属
+        String threadId = ID_PREFIX + Thread.currentThread().getId();
         Boolean success = stringRedisTemplate.opsForValue()
                 .setIfAbsent(KEY_PREFIX + name, threadId, expireSeconds, TimeUnit.SECONDS);
         return BooleanUtil.isTrue(success);
     }
 
     /**
-     * 释放锁
+     * 释放锁：执行 Lua 脚本，原子地完成“判断持有者标识 + 删除锁”，
+     * 只有锁的持有者（当前线程）才能释放自己的锁。
      */
     public void unlock() {
         String threadId = ID_PREFIX + Thread.currentThread().getId();
-        String currentValue = stringRedisTemplate.opsForValue().get(KEY_PREFIX + name);
-        if (threadId.equals(currentValue)) {
-            stringRedisTemplate.delete(KEY_PREFIX + name);
-        }
+        stringRedisTemplate.execute(UNLOCK_REDIS_SCRIPT,
+                Collections.singletonList(KEY_PREFIX + name), threadId);
     }
 }
