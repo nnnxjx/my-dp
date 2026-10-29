@@ -9,13 +9,17 @@ import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.utils.GlobalIdGenerator;
+import com.hmdp.utils.SimpleRedisLock;
 import com.hmdp.utils.UserHolder;
 import org.springframework.aop.framework.AopContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.time.LocalDateTime;
+
+import static com.hmdp.utils.RedisConstants.LOCK_ORDER_TTL;
 
 /**
  * <p>
@@ -33,6 +37,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @Resource
     private GlobalIdGenerator globalIdGenerator;
+
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     /**
      * 优惠券秒杀下单
@@ -65,11 +72,20 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         }
 
 
-        synchronized (userId.toString().intern()){
-            // 获取当前类的代理对象，通过代理调用 createVoucherOrder，
-            // 使 @Transactional 生效，保证“一人一单”的查询与写入在同一事务、且在同一把锁内提交
+        // 5. 获取分布式互斥锁：锁名 order:{userId}{voucherId}，保证同一用户抢同一张秒杀券时才互斥
+        String lockName = "order:" + userId + voucherId;
+        SimpleRedisLock lock = new SimpleRedisLock(stringRedisTemplate, lockName);
+        if (!lock.tryLock(LOCK_ORDER_TTL)) {
+            // 获取锁失败，说明同一用户正在下单，直接返回，不再重试
+            return Result.fail("请勿重复下单，请稍后再试");
+        }
+        try {
+            // 获取当前类的代理对象，通过代理调用 createVoucherOrder，使 @Transactional 生效，
+            // 保证“一人一单”的查询与写入在同一事务内，且在锁释放前提交
             IVoucherOrderService proxy = (IVoucherOrderService) AopContext.currentProxy();
             return proxy.createVoucherOrder(voucherId, userId);
+        } finally {
+            lock.unlock();
         }
     }
 

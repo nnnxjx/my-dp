@@ -14,6 +14,9 @@ public class RedisConstants {
     public static final String LOCK_SHOP_KEY = "lock:shop:";
     public static final Long LOCK_SHOP_TTL = 10L;
 
+    // 秒杀下单分布式锁的过期时间（秒）
+    public static final Long LOCK_ORDER_TTL = 10L;
+
     public static final String GLOBAL_ID_KEY = "global:id:";
 
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
