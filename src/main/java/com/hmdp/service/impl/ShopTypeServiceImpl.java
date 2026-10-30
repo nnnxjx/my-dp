@@ -43,7 +43,7 @@ public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType> i
         if (shopTypeList == null) {
             return Result.fail("商铺类型列表不存在");
         }
-        // 5. 数据库中存在，将商铺数据写入 redis 并设置有效期
+        // 5. 数据库中存在，将商铺数据写入 redis
         stringRedisTemplate.opsForValue()
                 .set(CACHE_SHOP_TYPE_KEY , JSONUtil.toJsonStr(shopTypeList));
         // 6. 返回商铺信息

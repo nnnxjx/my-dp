@@ -34,13 +34,7 @@ public class BlogController {
     @Operation(summary = "发布探店笔记")
     @PostMapping
     public Result saveBlog(@RequestBody Blog blog) {
-        // 获取登录用户
-        UserDTO user = UserHolder.getUser();
-        blog.setUserId(user.getId());
-        // 保存探店博文
-        blogService.save(blog);
-        // 返回id
-        return Result.ok(blog.getId());
+        return blogService.saveBlog(blog);
     }
 
     @Operation(summary = "给探店笔记点赞（再次点击取消点赞）")

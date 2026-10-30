@@ -8,6 +8,7 @@ import cn.hutool.core.util.BooleanUtil;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.Follow;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
 import com.hmdp.service.IBlogService;
@@ -38,7 +39,8 @@ import static com.hmdp.utils.RedisConstants.BLOG_LIKED_KEY;
  */
 @Service
 public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
-
+    @Resource
+    private FollowServiceImpl followService;
     @Resource
     private IUserService userService;
 
@@ -163,5 +165,28 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             blog.setName(user.getNickName());
             blog.setIcon(user.getIcon());
         }
+    }
+
+    @Override
+    public Result saveBlog(Blog blog) {
+        // 获取登录用户
+        UserDTO user = UserHolder.getUser();
+        blog.setUserId(user.getId());
+        // 保存探店博文
+        boolean isSuccess=save(blog);
+        if(!isSuccess){
+            return Result.fail("保存失败！");
+        }
+
+        //获取关注的粉丝id
+        List<Follow> follows = followService.query().eq("follow_user_id", user.getId()).list();
+        for(Follow follow : follows){
+            //feed:粉丝id 的收件箱
+            String key = "feed:" + follow.getUserId();
+
+            stringRedisTemplate.opsForZSet().add(key, blog.getId().toString(), System.currentTimeMillis());
+        }
+        // 返回id
+        return Result.ok(blog.getId());
     }
 }

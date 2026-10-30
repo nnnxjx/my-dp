@@ -54,4 +54,12 @@ public interface IBlogService extends IService<Blog> {
      * @return 当前页的笔记列表
      */
     Result queryBlogOfUser(Long userId, Integer current);
+
+    /**
+     * 保存探店笔记
+     *
+     * @param blog 探店笔记
+     * @return 操作结果
+     */
+    Result saveBlog(Blog blog);
 }
