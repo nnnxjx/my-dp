@@ -20,6 +20,9 @@ public class RedisConstants {
     public static final String GLOBAL_ID_KEY = "global:id:";
 
     public static final String SECKILL_STOCK_KEY = "seckill:stock:";
+
+    // 用户关注列表（SET），key 为 follows:{userId}，member 为被关注的用户id
+    public static final String FOLLOWS_KEY = "follows:";
     public static final String BLOG_LIKED_KEY = "blog:liked:";
     public static final String FEED_KEY = "feed:";
     public static final String SHOP_GEO_KEY = "shop:geo:";
