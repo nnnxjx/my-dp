@@ -3,25 +3,41 @@ package com.hmdp.service.impl;
 import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.mapper.ShopMapper;
 import com.hmdp.service.IShopService;
 import com.hmdp.utils.CacheClient;
+import com.hmdp.utils.SystemConstants;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.geo.Circle;
+import org.springframework.data.geo.Distance;
+import org.springframework.data.geo.GeoResult;
+import org.springframework.data.geo.GeoResults;
+import org.springframework.data.geo.Point;
+import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static com.hmdp.utils.RedisConstants.CACHE_NULL_TTL;
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
 import static com.hmdp.utils.RedisConstants.LOCK_SHOP_KEY;
 import static com.hmdp.utils.RedisConstants.LOCK_SHOP_TTL;
+import static com.hmdp.utils.RedisConstants.SHOP_GEO_KEY;
 
 /**
  * <p>
@@ -162,5 +178,60 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         stringRedisTemplate.delete(CACHE_SHOP_KEY + id);
 
         return Result.ok();
+    }
+
+    @Override
+    public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
+        // 1. x、y 任意一个为空，无法按距离搜索，直接按类型走数据库分页
+        if (x == null || y == null) {
+            Page<Shop> page = query()
+                    .eq("type_id", typeId)
+                    .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
+            return Result.ok(page.getRecords());
+        }
+
+        // 2. x、y 都存在，计算当前页需要跳过的条数 from 与需取到的末尾条数 to
+        int pageSize = SystemConstants.DEFAULT_PAGE_SIZE;
+        int from = (current - 1) * pageSize;
+        int to = current * pageSize;
+
+        // 3. GEORADIUS：按 typeId 对应的 key，以 (x,y) 为圆心、按距离升序返回前 to 条 member(shopId) + distance
+        //    用 GEORADIUS 而非 GEOSEARCH，兼容 Redis 6.2 以下版本（GEOSEARCH 需 6.2+）
+        //    GEORADIUS 的 LIMIT 只支持取前 N 条（无偏移），故取前 to 条后在内存中跳过前 from 条实现分页
+        //    半径取 5000 公里（远超实际业务范围），相当于返回该类型下全部商铺并按距离排序
+        String key = SHOP_GEO_KEY + typeId;
+        Circle circle = new Circle(new Point(x, y), new Distance(5000000));
+        GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo()
+                .radius(key, circle,
+                        RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs()
+                                .includeDistance()
+                                .sortAscending()
+                                .limit(to));
+
+        // 4. 解析出当前页的 shopId 列表（保持 Redis 返回的距离升序）及各 shopId 对应的距离
+        if (results == null || results.getContent().size() <= from) {
+            return Result.ok(Collections.emptyList());
+        }
+        List<GeoResult<RedisGeoCommands.GeoLocation<String>>> pageList =
+                results.getContent().subList(from, Math.min(results.getContent().size(), to));
+        List<Long> ids = new ArrayList<>(pageList.size());
+        Map<String, Distance> distanceMap = new HashMap<>(pageList.size());
+        pageList.forEach(g -> {
+            String shopId = g.getContent().getName();
+            ids.add(Long.valueOf(shopId));
+            distanceMap.put(shopId, g.getDistance());
+        });
+
+        // 5. 按 shopId 回查商铺，并依照现有 shopId 顺序重排，逐个填充 distance
+        Map<Long, Shop> shopMap = listByIds(ids).stream()
+                .collect(Collectors.toMap(Shop::getId, s -> s));
+        List<Shop> shops = ids.stream()
+                .map(shopMap::get)
+                .filter(Objects::nonNull)
+                .peek(shop -> shop.setDistance(distanceMap.get(shop.getId().toString()).getValue()))
+                .collect(Collectors.toList());
+
+        // 6. 返回当前页商铺列表
+        return Result.ok(shops);
     }
 }
