@@ -30,4 +30,12 @@ public interface IFollowService extends IService<Follow> {
      * @return isFollow：true-已关注，false-未关注
      */
     Result isFollow(Long id);
+
+    /**
+     * 查询当前登录用户与指定用户的共同关注列表（两个用户关注 SET 的交集）
+     *
+     * @param id 目标用户id
+     * @return 共同关注的 UserDTO 列表
+     */
+    Result queryCommonFollow(Long id);
 }

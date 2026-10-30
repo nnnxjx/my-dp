@@ -43,4 +43,11 @@ public class FollowController {
         // 业务逻辑在 Service：查 Redis SET 是否包含该用户
         return followService.isFollow(id);
     }
+
+    @Operation(summary = "查询当前登录用户与指定用户的共同关注列表")
+    @GetMapping("/common/{id}")
+    public Result queryCommonFollow(@PathVariable("id") Long id) {
+        // 业务逻辑在 Service：求两个用户关注 SET 的交集
+        return followService.queryCommonFollow(id);
+    }
 }

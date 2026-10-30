@@ -28,4 +28,12 @@ public interface IUserService extends IService<User> {
      * @return 成功时 data 为 token
      */
     Result login(LoginFormDTO loginForm);
+
+    /**
+     * 根据用户id查询用户信息（脱敏，不返回密码）
+     *
+     * @param id 用户id
+     * @return 用户信息；用户不存在返回失败
+     */
+    Result queryUserById(Long id);
 }

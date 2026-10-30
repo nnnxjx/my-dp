@@ -74,6 +74,13 @@ public class UserController {
         return Result.ok(user);
     }
 
+    @Operation(summary = "根据id查询用户信息")
+    @GetMapping("/{id}")
+    public Result queryById(@PathVariable("id") Long id) {
+        // 业务逻辑在 Service：查用户并脱敏，不返回密码
+        return userService.queryUserById(id);
+    }
+
     @Operation(summary = "根据id查询用户详情")
     @GetMapping("/info/{id}")
     public Result info(@PathVariable("id") Long userId){

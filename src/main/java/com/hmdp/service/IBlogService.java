@@ -45,4 +45,13 @@ public interface IBlogService extends IService<Blog> {
      * @return 前五名最早点赞的 UserDTO 列表，按点赞时间升序
      */
     Result queryBlogLikes(Long id);
+
+    /**
+     * 分页查询指定用户发布的探店笔记
+     *
+     * @param userId  用户id
+     * @param current 当前页码，从 1 开始
+     * @return 当前页的笔记列表
+     */
+    Result queryBlogOfUser(Long userId, Integer current);
 }

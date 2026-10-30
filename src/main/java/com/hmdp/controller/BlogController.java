@@ -77,6 +77,14 @@ public class BlogController {
         return Result.ok(records);
     }
 
+    @Operation(summary = "分页查询指定用户的探店笔记")
+    @GetMapping("/of/user")
+    public Result queryBlogOfUser(@RequestParam("id") Long id,
+                                  @RequestParam(value = "current", defaultValue = "1") Integer current) {
+        // 业务逻辑在 Service：按 user_id 分页查询 + 填充作者信息和点赞状态
+        return blogService.queryBlogOfUser(id, current);
+    }
+
     @Operation(summary = "分页查询热门探店笔记")
     @GetMapping("/hot")
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {

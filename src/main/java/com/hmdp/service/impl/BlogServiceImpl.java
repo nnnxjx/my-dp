@@ -131,6 +131,22 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         return Result.ok(records);
     }
 
+    @Override
+    public Result queryBlogOfUser(Long userId, Integer current) {
+        // 根据 user_id 分页查询该用户的笔记，每页最多 MAX_PAGE_SIZE 条
+        Page<Blog> page = query()
+                .eq("user_id", userId)
+                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+        // 获取当前页数据
+        List<Blog> records = page.getRecords();
+        // 列表页需要展示作者昵称、头像与当前用户是否点赞过，与热门列表保持一致
+        records.forEach(blog -> {
+            this.queryUserInfo(blog);
+            this.isLike(blog);
+        });
+        return Result.ok(records);
+    }
+
     private void isLike(Blog blog){
         Long userId = UserHolder.getUser().getId();
         if (userId == null) {
