@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.BooleanUtil;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ScrollResult;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
 import com.hmdp.entity.Follow;
@@ -16,13 +17,11 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import org.springframework.util.CollectionUtils;
@@ -188,5 +187,51 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         }
         // 返回id
         return Result.ok(blog.getId());
+    }
+
+
+    @Override
+    public Result queryBlogOfFollow(Long lastId, Integer offset) {
+        // 1. 获取当前登录用户
+        Long userId = UserHolder.getUser().getId();
+        // 2. 根据最小时间戳和偏移量获取用户关注推送的笔记列表
+        String key="feed:" + userId;
+        Set<ZSetOperations.TypedTuple<String>> typedValues = stringRedisTemplate.opsForZSet()
+                .reverseRangeByScoreWithScores(key, 0, lastId, offset, 5);
+
+        // 3. 本页无数据，直接返回空结果
+        if (typedValues == null || typedValues.isEmpty()) {
+            return Result.ok();
+        }
+        //4.获取blogId,offset,minTime
+        List<Long> blogIds = new ArrayList<>(typedValues.size());
+        Long minTime = null;
+        Integer newOffset = 1;
+        for (ZSetOperations.TypedTuple<String> typedValue : typedValues){
+            Long blogId = Long.valueOf(typedValue.getValue());
+            blogIds.add(blogId);
+            Long score = typedValue.getScore().longValue();
+            if(score == minTime ){
+                newOffset++;
+            }
+            else {
+                newOffset = 1;
+                minTime = score;
+            }
+        }
+
+
+        //5.根据blogId获取笔记
+        List<Blog> blogs = query().in("id", blogIds).last("ORDER BY FIELD(id," + blogIds + ")").list();
+        blogs.forEach(blog -> {
+            this.queryUserInfo(blog);
+            this.isLike(blog);
+        });
+
+        ScrollResult scrollResult = new ScrollResult();
+        scrollResult.setList(blogs);
+        scrollResult.setMinTime(minTime);
+        scrollResult.setOffset(newOffset);
+        return Result.ok(scrollResult);
     }
 }

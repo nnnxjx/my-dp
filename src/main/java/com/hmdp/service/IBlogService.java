@@ -62,4 +62,13 @@ public interface IBlogService extends IService<Blog> {
      * @return 操作结果
      */
     Result saveBlog(Blog blog);
+
+    /**
+     * 分页查询个人关注的博主发布的探店笔记
+     *
+     * @param lastId    上次查询的笔记最小的时间戳
+     * @param offset    偏移量
+     * @return 当前页的笔记列表
+     */
+    Result queryBlogOfFollow(Long lastId, Integer offset);
 }

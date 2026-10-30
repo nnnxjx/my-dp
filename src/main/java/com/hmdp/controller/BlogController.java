@@ -3,6 +3,7 @@ package com.hmdp.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ScrollResult;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
 import com.hmdp.service.IBlogService;
@@ -84,5 +85,13 @@ public class BlogController {
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
         // 业务逻辑在 Service：按点赞数降序分页 + 批量填充作者昵称头像
         return blogService.queryHotBlog(current);
+    }
+
+    @Operation(summary="分页查询个人关注笔记推送")
+    @GetMapping("/of/follow")
+    public Result queryBlogOfFollow(@RequestParam(value = "lastId") Long lastId,
+                                                  @RequestParam(value = "offset", defaultValue = "0") Integer offset) {
+        // 业务逻辑在 Service：按用户关注的博主的 id 列表查询 + 填充作者信息和点赞状态
+        return blogService.queryBlogOfFollow(lastId, offset);
     }
 }
