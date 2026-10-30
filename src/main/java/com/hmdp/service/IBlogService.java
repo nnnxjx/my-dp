@@ -1,6 +1,7 @@
 package com.hmdp.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.hmdp.dto.Result;
 import com.hmdp.entity.Blog;
 
 /**
@@ -13,4 +14,35 @@ import com.hmdp.entity.Blog;
  */
 public interface IBlogService extends IService<Blog> {
 
+    /**
+     * 根据id查询博客详情，附带作者用户信息和当前登录用户是否点赞
+     *
+     * @param id 博客id
+     * @return 博客详情；博客不存在返回失败
+     */
+    Result queryById(Long id);
+
+    /**
+     * 分页查询热门探店笔记（按点赞数降序），附带作者昵称、头像
+     *
+     * @param current 当前页码，从 1 开始
+     * @return 当前页的笔记列表
+     */
+    Result queryHotBlog(Integer current);
+
+    /**
+     * 点赞/取消点赞：同一用户对同一笔记只能点赞一次，再次点击则取消点赞
+     *
+     * @param id 笔记id
+     * @return 操作结果
+     */
+    Result likeBlog(Long id);
+
+    /**
+     * 查询笔记的点赞排行榜：最早点赞的前 5 名用户
+     *
+     * @param id 笔记id
+     * @return 前五名最早点赞的 UserDTO 列表，按点赞时间升序
+     */
+    Result queryBlogLikes(Long id);
 }

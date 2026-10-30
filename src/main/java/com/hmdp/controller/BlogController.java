@@ -5,9 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
-import com.hmdp.entity.User;
 import com.hmdp.service.IBlogService;
-import com.hmdp.service.IUserService;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,8 +30,6 @@ public class BlogController {
 
     @Resource
     private IBlogService blogService;
-    @Resource
-    private IUserService userService;
 
     @Operation(summary = "发布探店笔记")
     @PostMapping
@@ -47,13 +43,25 @@ public class BlogController {
         return Result.ok(blog.getId());
     }
 
-    @Operation(summary = "给探店笔记点赞")
+    @Operation(summary = "给探店笔记点赞（再次点击取消点赞）")
     @PutMapping("/like/{id}")
     public Result likeBlog(@PathVariable("id") Long id) {
-        // 修改点赞数量
-        blogService.update()
-                .setSql("liked = liked + 1").eq("id", id).update();
-        return Result.ok();
+        // 业务逻辑在 Service：Redis set 判断是否已点赞，未点赞过+1，已点赞过-1
+        return blogService.likeBlog(id);
+    }
+
+    @Operation(summary = "根据id查询探店笔记详情（含作者用户信息）")
+    @GetMapping("/{id}")
+    public Result queryById(@PathVariable("id") Long id) {
+        // 业务逻辑在 Service：查博客 + 填充作者昵称头像 + 当前用户是否点赞
+        return blogService.queryById(id);
+    }
+
+    @Operation(summary = "查询笔记点赞排行榜（前五名最早点赞的用户）")
+    @GetMapping("/likes/{id}")
+    public Result queryBlogLikes(@PathVariable("id") Long id) {
+        // 业务逻辑在 Service：按 ZSET 中点赞时间戳升序取前 5 名
+        return blogService.queryBlogLikes(id);
     }
 
     @Operation(summary = "分页查询我的探店笔记")
@@ -72,19 +80,7 @@ public class BlogController {
     @Operation(summary = "分页查询热门探店笔记")
     @GetMapping("/hot")
     public Result queryHotBlog(@RequestParam(value = "current", defaultValue = "1") Integer current) {
-        // 根据用户查询
-        Page<Blog> page = blogService.query()
-                .orderByDesc("liked")
-                .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
-        // 获取当前页数据
-        List<Blog> records = page.getRecords();
-        // 查询用户
-        records.forEach(blog ->{
-            Long userId = blog.getUserId();
-            User user = userService.getById(userId);
-            blog.setName(user.getNickName());
-            blog.setIcon(user.getIcon());
-        });
-        return Result.ok(records);
+        // 业务逻辑在 Service：按点赞数降序分页 + 批量填充作者昵称头像
+        return blogService.queryHotBlog(current);
     }
 }

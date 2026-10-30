@@ -86,7 +86,6 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
 
     @PostConstruct
     public void init() {
-        proxy = (IVoucherOrderService) AopContext.currentProxy();
         es.submit(new Task());
     }
 
@@ -116,8 +115,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         order.setId(globalIdGenerator.generateId("order"));
         order.setUserId(userId);
         order.setVoucherId(voucherId);
+        //4.获取代理对象
+        proxy = (IVoucherOrderService) AopContext.currentProxy();
         VOUCHER_ORDER_QUEUE.add(order);
-        //4.返回订单id
+        //5.返回订单id
         return Result.ok(order.getId());
     }
 /**
