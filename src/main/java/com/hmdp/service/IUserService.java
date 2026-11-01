@@ -44,4 +44,13 @@ public interface IUserService extends IService<User> {
      * @return 签到结果；当天已签到返回失败
      */
     Result sign();
+
+    /**
+     * 统计当前用户截止当前时间在本月的连续签到天数：
+     * 用 BITFIELD 取出本月 1 号到今天的 dayOfMonth 个 bit 组成的无符号整数，
+     * 再从最低位（1 号）开始逐位与 1 做与运算，为 1 则 sum++ 并右移一位，为 0 则终止
+     *
+     * @return 连续签到天数
+     */
+    Result signCount();
 }

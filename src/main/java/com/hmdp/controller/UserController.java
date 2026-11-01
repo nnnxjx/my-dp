@@ -84,6 +84,16 @@ public class UserController {
         return userService.sign();
     }
 
+    /**
+     * 统计当前用户截止当前时间在本月的连续签到天数
+     */
+    @Operation(summary = "统计本月连续签到天数")
+    @GetMapping("/sign/count")
+    public Result signCount() {
+        // 业务逻辑在 Service：BITFIELD 取本月已签到 bit 后逐位与 1 运算统计
+        return userService.signCount();
+    }
+
     @Operation(summary = "根据id查询用户信息")
     @GetMapping("/{id}")
     public Result queryById(@PathVariable("id") Long id) {

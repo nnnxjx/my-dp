@@ -17,6 +17,7 @@ import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -24,6 +25,7 @@ import javax.annotation.Resource;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -138,5 +140,40 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
             return Result.fail("您今天已经签到过了");
         }
         return Result.ok("签到成功");
+    }
+
+    @Override
+    public Result signCount() {
+        // 1. 获取当前登录用户
+        Long userId = UserHolder.getUser().getId();
+        // 2. 拼接与签到时同一个 key：sign:{userId}:{yyyy-MM}
+        LocalDateTime now = LocalDateTime.now();
+        String key = USER_SIGN_KEY + userId + ":" + now.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        // 3. 今天是本月第几天，就要取多少个 bit（从 bit 0 即 1 号开始）
+        int dayOfMonth = now.getDayOfMonth();
+        // 4. BITFIELD GET u{dayOfMonth} 0：把 1 号到今天的所有签到位组成一个无符号十进制数一次取回
+        List<Long> result = stringRedisTemplate.opsForValue().bitField(
+                key,
+                BitFieldSubCommands.create()
+                        .get(BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)).valueAt(0));
+        if (result == null || result.isEmpty()) {
+            return Result.ok(0);
+        }
+        Long num = result.get(0);
+        if (num == null || num == 0) {
+            return Result.ok(0);
+        }
+        // 5. 从最低位（1 号）开始逐位与 1 做与运算：为 1 说明当天签到了，sum++；为 0 中断累计；
+        //    每轮右移一位，让下一位落到末尾参与运算，最多遍历 dayOfMonth 位
+        int sum = 0;
+        for (int i = 0; i < dayOfMonth; i++) {
+            if ((num & 1) == 1) {
+                sum++;
+            } else {
+                break;
+            }
+            num >>>= 1;
+        }
+        return Result.ok(sum);
     }
 }
