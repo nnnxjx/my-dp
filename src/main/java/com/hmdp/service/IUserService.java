@@ -36,4 +36,12 @@ public interface IUserService extends IService<User> {
      * @return 用户信息；用户不存在返回失败
      */
     Result queryUserById(Long id);
+
+    /**
+     * 每日签到：用 Redis bitmap 存储，key 为 sign:{userId}:{yyyy-MM}，
+     * 当月第几天即对应 bit 位（从 0 开始）
+     *
+     * @return 签到结果；当天已签到返回失败
+     */
+    Result sign();
 }

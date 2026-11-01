@@ -2,6 +2,7 @@ package com.hmdp.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.bean.copier.CopyOptions;
+import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -14,11 +15,14 @@ import com.hmdp.service.IUserService;
 import com.hmdp.utils.PasswordEncoder;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.SystemConstants;
+import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -28,6 +32,7 @@ import static com.hmdp.utils.RedisConstants.LOGIN_CODE_KEY;
 import static com.hmdp.utils.RedisConstants.LOGIN_CODE_TTL;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
+import static com.hmdp.utils.RedisConstants.USER_SIGN_KEY;
 
 /**
  * <p>
@@ -116,5 +121,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         // 2. 脱敏：拷贝为 UserDTO，不包含密码字段
         UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
         return Result.ok(userDTO);
+    }
+
+    @Override
+    public Result sign() {
+        // 1. 获取当前登录用户（/user/sign 受登录拦截器保护，UserHolder 必有值）
+        Long userId = UserHolder.getUser().getId();
+        // 2. 获取当前日期，拼接 key：prefix + userId + 年月，如 sign:{userId}:2026-11
+        LocalDateTime now = LocalDateTime.now();
+        String key = USER_SIGN_KEY + userId + ":" + now.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        // 3. 当月第几天即对应 bit 位，从 0 开始保证每月 1 号落在第 0 位
+        int offset = now.getDayOfMonth() - 1;
+        // 4. SETBIT 签到，返回的是旧 bit 值，为 true 说明当天已签过，不重复计
+        Boolean signed = stringRedisTemplate.opsForValue().setBit(key, offset, true);
+        if (BooleanUtil.isTrue(signed)) {
+            return Result.fail("您今天已经签到过了");
+        }
+        return Result.ok("签到成功");
     }
 }

@@ -74,6 +74,16 @@ public class UserController {
         return Result.ok(user);
     }
 
+    /**
+     * 每日签到，签到数据用 Redis bitmap 存储
+     */
+    @Operation(summary = "每日签到")
+    @PostMapping("/sign")
+    public Result sign() {
+        // 业务逻辑在 Service：SETBIT 将 sign:{userId}:{yyyy-MM} 对应日期位置 1
+        return userService.sign();
+    }
+
     @Operation(summary = "根据id查询用户信息")
     @GetMapping("/{id}")
     public Result queryById(@PathVariable("id") Long id) {
