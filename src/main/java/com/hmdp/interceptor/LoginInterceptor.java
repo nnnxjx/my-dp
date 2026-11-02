@@ -21,7 +21,11 @@ public class LoginInterceptor implements HandlerInterceptor {
         // 1. 判断 ThreadLocal 中是否存在用户
         if (UserHolder.getUser() == null) {
             // 2. 不存在，说明未登录或 token 已失效，拦截并返回 401
-            log.debug("未登录，拦截请求：{}", request.getRequestURI());
+            log.debug("uri={}, 原始错误请求={}, 来源IP={}, UA={}",
+                    request.getRequestURI(),
+                    request.getAttribute("javax.servlet.error.request_uri"),
+                    request.getRemoteAddr(),
+                    request.getHeader("User-Agent"));
             response.setStatus(401);
             return false;
         }

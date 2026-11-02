@@ -11,6 +11,7 @@
 -- 拼接 key
 local voucherId = ARGV[1]
 local userId = ARGV[2]
+local orderId = ARGV[3]
 local stockKey = "seckill:stock:" .. voucherId
 local orderKey = "seckill:order:" .. voucherId
 
@@ -31,6 +32,7 @@ end
 redis.call('incrby', stockKey, -1)
 -- 4. 将 userId 存入当前优惠券的 set 集合，作为已下单标记
 redis.call('sadd', orderKey, userId)
+redis.call('set', 'seckill:reservation:' .. orderId, voucherId .. ':' .. userId)
 
 -- 下单成功，返回 0
 return 0

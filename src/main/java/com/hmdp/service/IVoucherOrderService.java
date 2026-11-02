@@ -23,19 +23,9 @@ public interface IVoucherOrderService extends IService<VoucherOrder> {
     Result seckillVoucher(Long voucherId);
 
     /**
-     * 创建秒杀订单（需在事务中执行），必须通过代理对象调用才能让 @Transactional 生效
-     *
-     * @param voucherId 优惠券id
-     * @param userId    下单用户id
-     * @return 成功返回订单id，失败返回异常原因
-     */
-    Result createVoucherOrder(Long voucherId, Long userId);
-
-    /**
-     * 创建秒杀订单（需在事务中执行），必须通过代理对象调用才能让 @Transactional 生效
+     * 消费 RabbitMQ 消息并在事务中创建订单
      *
      * @param voucherOrder 订单
-     * @return 成功返回订单id，失败返回异常原因
      */
     void createVoucherOrder(VoucherOrder voucherOrder);
 }
